@@ -1,0 +1,14 @@
+.DS_Store
+dist/
+.vercel/
+site/preview.html
+
+# Blender outputs: regenerate with the scripts in blender/ (see README).
+# The site only needs the three site/*.glb.txt files.
+blender/out/
+blender/workers_out/
+*.blend
+*.blend1
+
+# stray test renders
+/*.png

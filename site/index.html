@@ -1,0 +1,1163 @@
+<title>Alp Yücel — Interactive CV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one full-bleed 3D office, no page chrome; the only working CRT holds a small desktop OS */
+:root {
+  --bg: #0f1a14;
+  --ink: #eef2ec;
+  --muted: #9fb3a5;
+  --accent: #9be3a0;
+  /* CRT OS palette (lives inside the 3D world) */
+  --os-wall-a: #d6dccf;
+  --os-wall-b: #9fb0a2;
+  --os-win: #f7f6f2;
+  --os-side: #efede7;
+  --os-ink: #1f2230;
+  --os-soft: #5d6274;
+  --os-rule: #e3e1da;
+  --os-accent: #2f7d4f;
+  --os-bar: #24302a;
+  --os-bar-ink: #e9eee8;
+  --os-term: #121813;
+  --os-term-ink: #cfe3c4;
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); overflow: hidden; }
+#app { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--bg); }
+/* the 3D layers never take clicks themselves; only the live CRT screen does */
+.css, .gl { position: absolute; inset: 0; pointer-events: none; }
+
+.gate {
+  position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; text-align: center;
+  background: var(--bg); transition: opacity 1.4s;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.gate.gone { opacity: 0; pointer-events: none; }
+.gate-in { display: grid; gap: 16px; }
+.gate h1 { font: 700 clamp(3rem, 9vw, 6rem)/0.95 var(--f-display); letter-spacing: -0.035em; margin: 0; }
+.gate p { margin: 0; font: 0.85rem/1.6 var(--f-mono); color: var(--muted); letter-spacing: 0.06em; }
+.gate .kicker { font-size: 0.82rem; letter-spacing: 0.2em; color: var(--accent); }
+.gate .lede { font: 400 clamp(1.05rem, 1.6vw, 1.25rem)/1.55 var(--f-body); letter-spacing: 0; color: #c9d6cc; max-width: 36rem; justify-self: center; margin-top: 6px; text-wrap: balance; }
+.gate .go { color: var(--accent); font-size: 0.95rem; animation: breathe 2.4s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: .45; } }
+.gate-load, .gate-choose { display: grid; gap: 14px; justify-items: center; margin-top: 26px; }
+.gate .bar { width: min(320px, 70vw); height: 2px; background: rgba(238,242,236,.16); }
+.gate .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s linear; }
+.gate-choose div { display: flex; gap: 12px; }
+.gate-choose button { font: 500 0.95rem var(--f-mono); color: var(--ink); background: none; border: 1px solid var(--muted); padding: 13px 28px; cursor: pointer; transition: color .2s, border-color .2s; }
+.gate-choose button:hover, .gate-choose button:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
+.phone { display: none; position: fixed; inset: 0; z-index: 50; place-items: center; text-align: center; padding: 24px; background: var(--bg); }
+.phone-only .phone { display: grid; }
+.phone-only #app, .phone-only #screen { display: none; }
+.phone h1 { font: 700 2.8rem/1 var(--f-display); letter-spacing: -0.03em; margin: 0 0 18px; }
+.phone p { margin: 0; font: 1rem/1.7 var(--f-body); color: #c9d6cc; }
+.phone .kicker { font: 0.75rem/1 var(--f-mono); letter-spacing: 0.2em; color: var(--accent); margin-bottom: 14px; }
+.whisper {
+  position: absolute; z-index: 5; left: 50%; transform: translateX(-50%); text-align: center;
+  width: max-content; max-width: calc(100% - 32px); box-sizing: border-box;
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  padding: 10px 20px; border-radius: 999px;
+  background: rgba(9, 15, 11, .72); box-shadow: 0 0 0 1px rgba(155, 227, 160, .22);
+  font: 500 0.95rem var(--f-mono); letter-spacing: 0.06em; color: var(--ink);
+  pointer-events: none; opacity: 0; transition: opacity 1s;
+}
+.whisper.on { opacity: 1; }
+
+/* ===== CRT OS: fixed 1024x768 px (4:3), scaled into 3D ===== */
+.screen {
+  width: 1024px; height: 768px; position: relative; overflow: hidden; border-radius: 22px;
+  font-family: var(--f-body); color: var(--os-ink); pointer-events: none; user-select: none;
+  background: linear-gradient(160deg, var(--os-wall-a), var(--os-wall-b));
+}
+.screen.live { pointer-events: auto; }
+.screen button { font-family: inherit; }
+.screen .wall { position: absolute; inset: 0; background: radial-gradient(circle at 78% 20%, rgba(255,255,255,.55), transparent 42%); }
+.screen .wall::after {
+  content: "AlpOS"; position: absolute; right: 40px; bottom: 76px;
+  font: 700 96px/1 var(--f-display); letter-spacing: -0.04em; color: rgba(31,34,48,.08);
+}
+.icons { position: absolute; left: 24px; top: 24px; bottom: 76px; display: grid; grid-auto-flow: column; grid-template-rows: repeat(5, 116px); grid-auto-columns: 108px; gap: 4px; }
+.icon { all: unset; cursor: pointer; display: grid; justify-items: center; align-content: start; gap: 8px; padding: 10px 4px; border-radius: 10px; }
+.icon svg { width: 58px; height: 58px; filter: drop-shadow(0 4px 6px rgba(20,24,40,.25)); }
+.icon span { font: 500 16px/1.2 var(--f-body); color: var(--os-ink); text-align: center; text-shadow: 0 1px 0 rgba(255,255,255,.6); }
+.icon:hover { background: rgba(255,255,255,.28); }
+.icon.sel { background: rgba(31,34,48,.14); }
+.icon:focus-visible { outline: 3px solid var(--os-accent); }
+
+.win {
+  position: absolute; background: var(--os-win); border-radius: 12px; overflow: hidden;
+  box-shadow: 0 24px 50px rgba(20,24,40,.3), 0 0 0 1px rgba(20,24,40,.1);
+  display: grid; grid-template-rows: 46px 1fr; animation: pop .18s ease-out;
+}
+@keyframes pop { from { transform: scale(.96); opacity: 0; } }
+.win.min { display: none; }
+.win.top { box-shadow: 0 30px 70px rgba(20,24,40,.4), 0 0 0 1px rgba(20,24,40,.16); }
+.bar { display: flex; align-items: center; gap: 12px; padding: 0 8px 0 18px; background: var(--os-bar); color: var(--os-bar-ink); cursor: grab; touch-action: none; }
+.win:not(.top) .bar { background: #5a635d; }
+.bar .wtitle { font: 500 17px var(--f-mono); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar button { all: unset; cursor: pointer; width: 34px; height: 30px; display: grid; place-items: center; border-radius: 6px; font: 500 20px/1 var(--f-mono); color: var(--os-bar-ink); }
+.bar button:hover { background: rgba(255,255,255,.14); }
+.bar button[data-a="close"]:hover { background: #d9634a; }
+.wbody { overflow: auto; min-height: 0; min-width: 0; }
+
+.doc { padding: 28px 34px; display: grid; gap: 16px; align-content: start; }
+.doc h3 { font: 600 14px/1 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--os-accent); margin: 0; }
+.doc h2 { font: 700 42px/1.04 var(--f-display); letter-spacing: -0.02em; margin: 0; }
+.doc p { font-size: 19px; line-height: 1.55; margin: 0; }
+.doc .muted { color: var(--os-soft); }
+.doc a { color: var(--os-accent); }
+.doc .me { display: flex; gap: 22px; align-items: center; }
+.doc .avatar { width: 88px; height: 88px; border-radius: 50%; background: var(--os-accent); color: #fff; display: grid; place-items: center; font: 700 36px var(--f-display); flex: none; }
+.tl { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.tl li { display: grid; grid-template-columns: 140px 1fr; gap: 18px; border-top: 1px solid var(--os-rule); padding-top: 12px; }
+.tl .when { font: 500 15px/1.6 var(--f-mono); color: var(--os-soft); }
+.tl.dates li { grid-template-columns: 186px 1fr; }
+.tl.dates .when { white-space: nowrap; }
+.doc .role { font: 500 16px/1.3 var(--f-mono); color: var(--os-soft); margin: 6px 0 0; }
+.doc h3:not(:first-child) { margin-top: 10px; }
+.tl b { display: block; font-size: 19px; font-weight: 600; }
+.tl span.d { font-size: 17px; color: var(--os-soft); line-height: 1.5; }
+.tl span.pt { display: block; position: relative; padding-left: 18px; margin-top: 5px; font-size: 17px; color: var(--os-soft); line-height: 1.45; }
+.tl span.pt::before { content: "▸"; position: absolute; left: 0; color: var(--os-accent); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips span { font-size: 17px; border: 1.5px solid var(--os-ink); border-radius: 999px; padding: 5px 14px; }
+
+.folder { padding: 22px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; align-content: start; }
+.card { all: unset; cursor: pointer; display: grid; gap: 8px; padding: 12px; border-radius: 10px; }
+.card:hover { background: var(--os-side); }
+.card .thumb { height: 110px; border-radius: 8px; }
+.card b { font-size: 18px; font-weight: 600; }
+.card span { font: 14px var(--f-mono); color: var(--os-soft); }
+.card .thumb { display: grid; align-content: end; padding: 10px 12px; box-sizing: border-box; font: 500 13px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.92); }
+.proj .hero { height: 160px; border-radius: 10px; }
+
+.term { background: var(--os-term); color: var(--os-term-ink); font: 17px/1.5 var(--f-mono); padding: 18px 20px; min-height: 100%; box-sizing: border-box; cursor: text; user-select: text; }
+.term .out div { white-space: pre-wrap; }
+.term .line { display: flex; gap: 10px; }
+.term .ps { color: #9be3a0; white-space: nowrap; }
+.term input { all: unset; flex: 1; color: var(--os-term-ink); caret-color: #9be3a0; }
+
+.paint { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+.paint .tools { display: flex; gap: 8px; align-items: center; padding: 10px 14px; background: var(--os-side); border-bottom: 1px solid var(--os-rule); }
+.paint .sw { all: unset; cursor: pointer; width: 28px; height: 28px; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(0,0,0,.12); }
+.paint .sw.on { box-shadow: 0 0 0 3px var(--os-win), 0 0 0 5px var(--os-ink); }
+.paint .tb { all: unset; cursor: pointer; margin-left: auto; font: 500 15px var(--f-mono); padding: 6px 12px; border-radius: 6px; border: 1.5px solid var(--os-ink); }
+.paint canvas { width: 100%; height: 100%; display: block; background: #fff; cursor: crosshair; touch-action: none; }
+
+.snake { display: grid; justify-items: center; gap: 10px; padding: 16px; background: #1c241d; height: 100%; box-sizing: border-box; }
+.snake canvas { width: 400px; height: 400px; background: #2a3527; border-radius: 6px; }
+.snake .sc { font: 500 16px var(--f-mono); color: #cfe3c4; }
+.copy { all: unset; cursor: pointer; font: 500 15px var(--f-mono); padding: 6px 12px; border-radius: 6px; border: 1.5px solid var(--os-ink); justify-self: start; }
+
+.task {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 56px; z-index: 900;
+  background: rgba(30,38,33,.93); color: var(--os-bar-ink);
+  display: flex; align-items: center; gap: 8px; padding: 0 18px;
+}
+.task button { all: unset; cursor: pointer; height: 40px; padding: 0 14px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font: 500 16px var(--f-mono); color: var(--os-bar-ink); }
+.task button:hover { background: rgba(255,255,255,.1); }
+.task .start { font-weight: 600; }
+.task .start.open, .taskwins button.on { background: rgba(255,255,255,.16); }
+.taskwins { display: flex; gap: 6px; flex: 1; overflow: hidden; }
+.taskwins button { max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 40px; }
+.taskwins button.mn { opacity: .55; }
+.tray { display: flex; align-items: center; gap: 4px; font: 500 16px var(--f-mono); }
+.tray svg { width: 22px; height: 22px; }
+.startmenu {
+  position: absolute; left: 14px; bottom: 64px; z-index: 950; width: 290px;
+  background: var(--os-win); border-radius: 12px; overflow: hidden;
+  box-shadow: 0 24px 50px rgba(20,24,40,.35), 0 0 0 1px rgba(20,24,40,.12);
+  display: grid; padding: 8px;
+}
+.startmenu .head { padding: 14px 14px 10px; font: 700 22px var(--f-display); }
+.startmenu button { all: unset; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; font: 500 17px var(--f-body); }
+.startmenu button:hover { background: var(--os-side); }
+.startmenu svg { width: 30px; height: 30px; }
+.startmenu hr { border: 0; border-top: 1px solid var(--os-rule); margin: 6px 4px; width: auto; }
+
+/* idle (before first sit-down): glowing phosphor so the one working CRT reads as "on" from across the room */
+.boot { position: absolute; inset: 0; z-index: 990; background: radial-gradient(circle at 50% 45%, #3f9a5c, #12361f 75%); color: #9be3a0; font: 18px/1.6 var(--f-mono); padding: 46px 54px; transition: opacity .6s, background .4s; }
+.boot.run { background: #0b0f0c; }
+.boot .logo { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 14px; font: 700 88px/1 var(--f-display); color: #d8f7da; letter-spacing: -0.03em; text-shadow: 0 0 30px rgba(155,227,160,.8); }
+.boot .logo small { font: 500 22px var(--f-mono); letter-spacing: .12em; color: #b9efbd; text-shadow: none; animation: breathe 2s ease-in-out infinite; }
+.boot.gone { opacity: 0; pointer-events: none; }
+.glass {
+  position: absolute; inset: 0; pointer-events: none; z-index: 999; border-radius: 22px;
+  background:
+    radial-gradient(ellipse at center, transparent 62%, rgba(0,0,0,.32) 100%),
+    linear-gradient(115deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 36%),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.045) 0 2px, transparent 2px 4px);
+}
+@media (prefers-reduced-motion: reduce) { .gate .go { animation: none; } .win { animation: none; } }
+</style>
+
+<div class="phone" id="phone"><div><p class="kicker">GREEN OFFICE · INTERACTIVE CV</p><h1>Alp Yücel</h1><p>This website is not built for phones.<br>Please open it on a computer.</p></div></div>
+<script>if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || matchMedia('(hover: none) and (pointer: coarse)').matches) document.documentElement.classList.add('phone-only');</script>
+<div id="app">
+  <div class="gate" id="gate">
+    <div class="gate-in">
+      <p class="kicker">GREEN OFFICE · INTERACTIVE CV</p>
+      <h1>Alp Yücel</h1>
+      <p class="lede">Engineering and finance background. I automate recurring work and build AI products, aiming at innovation, venture capital and startups.</p>
+      <div class="gate-load" id="gateLoad">
+        <div class="bar"><i id="gateBar"></i></div>
+        <p class="go" id="gateGo">setting up the office… 0%</p>
+      </div>
+      <div class="gate-choose" id="gateChoose" hidden>
+        <p class="go" id="gateAsk">start with sound?</p>
+        <div><button type="button" data-sound="1">Sound on</button><button type="button" data-sound="0">Sound off</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="whisper" id="whisper">one of the four computers is on · click it</div>
+</div>
+
+<div id="screen" class="screen">
+  <div class="wall"></div>
+  <div class="icons" id="icons"></div>
+  <div id="wins"></div>
+  <div class="startmenu" id="startmenu" hidden></div>
+  <div class="task">
+    <button class="start" id="startBtn" type="button">◧ AlpOS</button>
+    <div class="taskwins" id="taskwins"></div>
+    <div class="tray"><button id="muteBtn" type="button" aria-label="Toggle sound"></button><span id="clock">--:--</span></div>
+  </div>
+  <div class="boot" id="boot"><div class="logo">AlpOS<small>CLICK TO SIT DOWN</small></div><div id="bootLog"></div></div>
+  <div class="glass"></div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { Reflector } from 'three/addons/objects/Reflector.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+if (document.documentElement.classList.contains('phone-only')) throw new Error('computers only');
+const app = document.getElementById('app');
+const screenEl = document.getElementById('screen');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = (s, r = document) => r.querySelector(s);
+const SW = 1024, SH = 768;                 // CRT OS resolution (4:3)
+
+/* =====================================================================
+   SOUND — synthesised with Web Audio, no files
+   ===================================================================== */
+const Sound = {
+  ctx: null, master: null, muted: false,
+  init() {
+    if (this.ctx) return;
+    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
+    const c = this.ctx;
+    this.master = c.createGain(); this.master.gain.value = 0.7; this.master.connect(c.destination);
+    const len = c.sampleRate * 4, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+    let last = 0; for (let i = 0; i < len; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.5; }
+    this.noise = buf;
+    const white = c.createBuffer(1, c.sampleRate * 2, c.sampleRate), w = white.getChannelData(0);
+    for (let i = 0; i < w.length; i++) w[i] = Math.random() * 2 - 1;
+    this.white = white;
+  },
+  burst(freq, dur, gain, q = 1.2, buf = this.noise, at = 0) {
+    if (!this.ctx || this.muted) return;
+    const c = this.ctx, s = c.createBufferSource(); s.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
+    const g = c.createGain(), t = c.currentTime + at;
+    g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f).connect(g).connect(this.master); s.start(t, Math.random() * 1.8, dur + 0.02);
+  },
+  click() { this.burst(2600, 0.035, 2.2); this.burst(900, 0.05, 1.2); },
+  // one keystroke: bright tick, low thock of the key bottoming out, softer tick on release
+  clack(level, bright = 1) {
+    const r = Math.random;
+    this.burst((2800 + r() * 1600) * bright, 0.014, level * 0.7, 1, this.white);
+    this.burst(380 + r() * 260, 0.05, level, 1.4, this.white);
+    this.burst((2000 + r() * 1200) * bright, 0.012, level * 0.3, 1, this.white, 0.05 + r() * 0.04);
+  },
+  key() { this.clack(0.9); },
+  distantKey(level = 1) { this.clack(0.55 * level, 0.7); },
+  tone(f, at, dur, gain = 0.05, type = 'sine') {
+    if (!this.ctx || this.muted) return;
+    const c = this.ctx, o = c.createOscillator(), g = c.createGain(), t = c.currentTime + at;
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(this.master); o.start(t); o.stop(t + dur + 0.05);
+  },
+  crtOn() { this.tone(15600, 0, 1.2, 0.006); this.burst(180, 0.35, 0.5, 0.5); },
+  chime() { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, i * 0.11, 1.4, 0.045)); },
+  blip() { this.tone(880, 0, 0.12, 0.04, 'square'); },
+  setMuted(m) { this.muted = m; if (this.master) this.master.gain.value = m ? 0 : 0.7; drawMute(); },
+};
+const muteBtn = $('#muteBtn');
+function drawMute() {
+  muteBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor"/>${Sound.muted ? '<path d="M17 9l5 6M22 9l-5 6"/>' : '<path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>'}</svg>`;
+}
+drawMute();
+muteBtn.onclick = () => Sound.setMuted(!Sound.muted);
+
+/* =====================================================================
+   OS — apps, windows, taskbar, start menu
+   ===================================================================== */
+const tile = (bg, inner) => `<svg viewBox="0 0 48 48"><rect x="2" y="2" width="44" height="44" rx="11" fill="${bg}"/>${inner}</svg>`;
+const ICON = {
+  about: tile('#2f7d4f', '<circle cx="24" cy="19" r="7" fill="#fff"/><path d="M11 39c2-8 7-11 13-11s11 3 13 11z" fill="#fff"/>'),
+  lab: tile('#5a4fb0', '<path d="M20 11h8M22 11v11l-9 14c-1 2 0 3 2 3h18c2 0 3-1 2-3l-9-14V11" stroke="#fff" stroke-width="3" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M18 31h12l3 5H15z" fill="#fff"/>'),
+  now: tile('#c9792b', '<circle cx="24" cy="24" r="13" fill="none" stroke="#fff" stroke-width="3.5"/><path d="M24 16v9l6 4" stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round"/>'),
+  work: tile('#3f6e8c', '<rect x="10" y="17" width="28" height="19" rx="3" fill="#fff"/><path d="M19 17v-4h10v4" stroke="#fff" stroke-width="3" fill="none"/><rect x="10" y="24" width="28" height="3" fill="#3f6e8c"/>'),
+  projects: tile('#e6b84f', '<path d="M9 15h11l3 4h16v18H9z" fill="#fff"/>'),
+  terminal: tile('#1f2230', '<path d="M12 17l7 7-7 7" stroke="#9be3a0" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M23 32h12" stroke="#9be3a0" stroke-width="3.5" stroke-linecap="round"/>'),
+  paint: tile('#7c4a64', '<circle cx="24" cy="24" r="13" fill="#fff"/><circle cx="19" cy="19" r="3" fill="#d9634a"/><circle cx="28" cy="18" r="3" fill="#3f6e8c"/><circle cx="31" cy="26" r="3" fill="#4d7a5a"/><circle cx="21" cy="30" r="3.5" fill="#7c4a64"/>'),
+  snake: tile('#4d7a5a', '<path d="M12 32c0-6 8-6 8-12s8-6 8 0 8 6 8 0" stroke="#e6f0d8" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="36" cy="20" r="1.6" fill="#1f2230"/>'),
+  contact: tile('#d9634a', '<rect x="10" y="14" width="28" height="20" rx="3" fill="#fff"/><path d="M11 16l13 10 13-10" stroke="#d9634a" stroke-width="2.5" fill="none"/>'),
+  trash: tile('#8a8f9e', '<path d="M15 17h18l-2 20H17z" fill="#fff"/><rect x="13" y="13" width="22" height="3.5" rx="1.5" fill="#fff"/><rect x="21" y="10" width="6" height="3" fill="#fff"/>'),
+};
+const PROJECTS = [
+  { name: 'Capy Studio', kind: 'AI product', tag: 'Next.js · Supabase · Claude API', color: 'linear-gradient(135deg,#c9792b,#e6b84f)', year: '2026',
+    text: 'A control room for a capybara AI influencer. Claude studies the best performing posts and writes ideas, hooks and captions in the character voice. The app schedules the posts and drafts replies that a human approves one by one.', role: 'Independent project · built with Claude Code' },
+  { name: 'Claude Copilot', kind: 'AI product', tag: 'Python · Claude vision · macOS', color: 'linear-gradient(135deg,#1f2230,#5a4fb0)', year: '2026',
+    text: 'An invisible macOS assistant. One keyboard shortcut captures the screen, sends it to Claude and shows the answer as a translucent subtitle that fades after 15 seconds. Useful for code errors, spreadsheet anomalies and page summaries.', role: 'Independent project · built with Claude Code' },
+  { name: 'TUM Tutor AI', kind: 'AI product', tag: 'Python · Retrieval · Claude API', color: 'linear-gradient(135deg,#3f6e8c,#9be3a0)', year: '2026',
+    text: 'A study helper for a TUM course. It explains the logic behind a multiple-choice question from the lecture notes and points to the section to revise. It deliberately never gives away the answer.', role: 'Personal tool · built with Claude Code' },
+  { name: 'PMO Automation', kind: 'Automation', tag: 'Python', color: 'linear-gradient(135deg,#3f6e8c,#1f2230)', year: 'Infineon · 2026 – now',
+    text: 'Python automation that takes over recurring PMO processes, alongside quarterly reporting and budget analysis.', role: 'PMO working student at Infineon' },
+  { name: 'Portfolio Tracker', kind: 'Automation', tag: 'Python · Claude Code', color: 'linear-gradient(135deg,#2f7d4f,#e6b84f)', year: '2025 – now',
+    text: 'A personal tracker for my blockchain investments, part of a set of investment and automation tools I build for myself.', role: 'Solo project' },
+  { name: 'Memesis Coin', kind: 'Venture', tag: 'Early-stage venture', color: 'linear-gradient(135deg,#2f3f78,#7c4a64)', year: '2024 – 2025',
+    text: 'A blockchain gaming venture delivering web games as a Telegram app with its own in-app currency. I saw from the inside how an early-stage company raises capital and finds its first users.', role: 'Co-developer · contributed to the fundraise and built community traction from zero' },
+  { name: 'Kahve POS', kind: 'Product MVP', tag: 'Next.js · TypeScript', color: 'linear-gradient(135deg,#3a2418,#c9792b)', year: '2026',
+    text: 'A sales and stock tracking MVP for a small coffee shop, built as one lightweight web app.', role: 'MVP' },
+  { name: 'Green Office', kind: 'This site', tag: 'Three.js · Blender · Python', color: 'linear-gradient(135deg,#2d6a43,#9be3a0)', year: '2026',
+    text: 'The site you are sitting in. The office is modelled and lit by Python scripts in Blender, and rendered live in the browser around a small working desktop OS.', role: 'Independent project · built with Claude Code' },
+  { name: 'University Projects', kind: 'Academic', tag: 'Python · ML · SQL', color: 'linear-gradient(135deg,#c9792b,#3a2418)', year: 'Bilkent',
+    text: 'A machine-learning movie recommender in Python, and a marketplace application on SQL and Python.', role: 'Academic projects' },
+];
+const pts = list => list.map(t => `<span class="pt">${t}</span>`).join('');
+const APPS = {
+  about: { title: 'About', w: 660, h: 700, html: () => `
+    <div class="doc">
+      <div class="me"><div class="avatar">AY</div><div><h2>Alp Yücel</h2><p class="role">MSc Management · TU Munich</p></div></div>
+      <p>I work where finance, technology and innovation meet, with a focus on automation and AI products. I hold a BSc in Mechanical Engineering from Bilkent University and am completing an MSc in Management at TU Munich, specialising in Finance and Innovation Management.</p>
+      <p>At Infineon I automate recurring PMO processes. Before that I owned the budget and commercial management of a major defence programme at ROKETSAN and worked in technology consulting at EY.</p>
+      <p>On my own I take AI products from idea to working software, and I contributed to the fundraise of an early-stage gaming venture.</p>
+      <p>I am looking for roles in innovation, venture capital and startups, where financial judgement and hands-on building are needed together.</p>
+      <p class="muted">Based in Munich. Selected work is in AI Lab and Projects.</p>
+    </div>` },
+  lab: { title: 'AI Lab', w: 680, h: 640, html: () => `
+    <div class="doc">
+      <h3>AI Lab</h3><h2>AI products and automation</h2>
+      <p>I take ideas from concept to working software with Claude Code. Two things drive the work: products with AI at the core, and automation that takes recurring work off people's desks.</p>
+      <h3>What I build</h3>
+      <ul class="tl">
+        <li><span class="when">AI products</span><div><b>Software with AI at the core</b><span class="d">A content studio for an AI influencer, a screen assistant for macOS and a study tutor for a TUM course.</span></div></li>
+        <li><span class="when">Automation</span><div><b>Recurring work handed over to code</b><span class="d">From PMO processes at Infineon to my own investment tools.</span></div></li>
+        <li><span class="when">Prototypes</span><div><b>From idea to a working demo, fast</b><span class="d">Small web products and dashboards, and this 3D office.</span></div></li>
+      </ul>
+      <h3>AI toolbox</h3>
+      <div class="chips"><span>Claude Code</span><span>Claude API</span><span>Claude</span><span>ChatGPT</span><span>Copilot</span></div>
+    </div>` },
+  now: { title: 'Now', w: 600, h: 690, html: () => `
+    <div class="doc">
+      <h3>Now · autumn 2026</h3>
+      <ul class="tl">
+        <li><span class="when">Working</span><div><b>PMO Working Student · Infineon</b><span class="d">Automating recurring PMO processes, quarterly reports and budget analyses.</span></div></li>
+        <li><span class="when">Building</span><div><b>AI products and automation tools</b><span class="d">Independent projects, built with Claude Code.</span></div></li>
+        <li><span class="when">Studying</span><div><b>MSc Management · TU Munich</b><span class="d">Finance and Innovation Management.</span></div></li>
+        <li><span class="when">Learning</span><div><b>German</b><span class="d">A2 and improving through courses.</span></div></li>
+      </ul>
+      <h3>Looking for</h3>
+      <p>Roles in innovation, venture capital and startups, where finance, automation and AI products meet.</p>
+      <h3>Interests</h3>
+      <div class="chips"><span>AI tools</span><span>Building with Claude Code</span><span>Startups</span><span>Venture capital</span><span>Gaming</span><span>Cinema</span><span>Music production</span><span>History</span></div>
+    </div>` },
+  work: { title: 'Experience', w: 760, h: 690, html: () => `
+    <div class="doc">
+      <h3>Experience</h3>
+      <ul class="tl dates">
+        <li><span class="when">Sep 2026 – now</span><div><b>PMO Working Student · Infineon Technologies</b><span class="d">Munich, Germany</span>${pts([
+          'Automate recurring PMO processes with Python.',
+          'Prepare quarterly reports and budget analyses on project financial health.',
+          'Track deliverables and milestones for system innovation projects.',
+        ])}</div></li>
+        <li><span class="when">Jan 2025 – Sep 2025</span><div><b>Junior Project Manager · ROKETSAN</b><span class="d">Ankara, Türkiye</span>${pts([
+          'Owned budget planning and cost controlling for a major defence programme.',
+          'Managed the commercial side of 7–8 subcontracts of USD 1.5–2M each, with a lead role in supplier negotiations that pulled the schedule forward by about 5–6 months.',
+          'Built KPI reporting for senior management and screened new business opportunities.',
+        ])}</div></li>
+        <li><span class="when">Aug 2023 – May 2024</span><div><b>Long-Term Intern, Technology Consulting · EY</b><span class="d">Ankara, Türkiye</span>${pts([
+          'Built reporting dashboards that improved reporting efficiency by up to 25%.',
+          'Supported digital transformation engagements for clients with portfolios above USD 50M.',
+          'Contributed to 10+ client meetings and workshops, turning complex analysis into clear recommendations.',
+        ])}</div></li>
+        <li><span class="when">Jul 2022 – Aug 2022</span><div><b>Engineering Intern · Turkish Aerospace</b><span class="d">Ankara, Türkiye</span>${pts([
+          'Analysed and optimised production workflows with cross-functional teams.',
+        ])}</div></li>
+      </ul>
+      <h3>Education</h3>
+      <ul class="tl dates">
+        <li><span class="when">Oct 2025 – now</span><div><b>MSc Management · TU Munich</b><span class="d">Specialisation in Finance and Innovation Management.</span></div></li>
+        <li><span class="when">Sep 2019 – Jun 2024</span><div><b>BSc Mechanical Engineering · Bilkent University</b><span class="d">Top 10% of the class, 50% merit scholarship.</span></div></li>
+      </ul>
+      <h3>AI &amp; automation</h3>
+      <div class="chips"><span>Claude Code</span><span>Claude API</span><span>Python automation</span><span>ChatGPT</span><span>Copilot</span></div>
+      <h3>Finance</h3>
+      <div class="chips"><span>Financial modelling and valuation</span><span>Budgeting and cost controlling</span><span>Contract and cost analysis</span><span>Investment, tax and incentive analysis</span></div>
+      <h3>Data &amp; tools</h3>
+      <div class="chips"><span>Python</span><span>SQL</span><span>Excel (advanced)</span><span>PowerPoint (advanced)</span><span>Power BI</span><span>Tableau</span></div>
+      <h3>Languages</h3>
+      <div class="chips"><span>Turkish · native</span><span>English · fluent</span><span>German · A2</span></div>
+    </div>` },
+  projects: { title: 'Projects', w: 700, h: 650, html: () => `
+    <div class="folder">${PROJECTS.map((p, i) => `
+      <button class="card" type="button" data-proj="${i}"><div class="thumb" style="background:${p.color}">${p.kind}</div><b>${p.name}</b><span>${p.year}</span></button>`).join('')}
+    </div>`,
+    mount(body) { body.querySelectorAll('[data-proj]').forEach(b => b.onclick = () => openProject(+b.dataset.proj)); } },
+  terminal: { title: 'Terminal', w: 600, h: 390, html: () => `
+    <div class="term"><div class="out"></div><div class="line"><span class="ps">alp@alpos:~$</span><input aria-label="Command" spellcheck="false" autocomplete="off"></div></div>`,
+    mount: mountTerminal },
+  paint: { title: 'Paint', w: 620, h: 450, html: () => `
+    <div class="paint"><div class="tools"></div><canvas width="1240" height="760"></canvas></div>`, mount: mountPaint },
+  snake: { title: 'Snake', w: 432, h: 520, html: () => `
+    <div class="snake"><span class="sc">Score: 0 · best: 0</span><canvas width="400" height="400"></canvas><span class="sc">arrow keys to steer · space to start</span></div>`, mount: mountSnake },
+  contact: { title: 'Contact', w: 520, h: 380, html: () => `
+    <div class="doc">
+      <h3>Contact</h3><h2>Let's talk.</h2>
+      <p>alpyucel12@gmail.com</p>
+      <button class="copy" type="button">Copy address</button>
+      <p class="muted"><a href="https://linkedin.com/in/alp-yucel" target="_blank" rel="noopener">linkedin.com/in/alp-yucel</a><br>Munich, Germany</p>
+    </div>`,
+    mount(body) {
+      const b = $('.copy', body);
+      b.onclick = () => navigator.clipboard?.writeText('alpyucel12@gmail.com').then(() => { b.textContent = 'Copied'; }, () => { b.textContent = 'Couldn\'t copy, select it by hand'; });
+    } },
+  trash: { title: 'Trash', w: 440, h: 260, html: () => `
+    <div class="doc"><h3>Trash</h3><p>The trash is empty.</p><p class="muted">The other three computers are switched off. The coworkers keep typing anyway.</p></div>` },
+};
+const DESKTOP = ['about', 'lab', 'now', 'work', 'projects', 'terminal', 'paint', 'snake', 'contact', 'trash'];
+
+const iconsEl = $('#icons'), winsEl = $('#wins'), taskwins = $('#taskwins'), startmenu = $('#startmenu'), startBtn = $('#startBtn');
+const wins = new Map();
+let zTop = 10, cascade = 0, onTopChange = () => {};
+
+DESKTOP.forEach(id => {
+  const b = document.createElement('button');
+  b.className = 'icon'; b.type = 'button';
+  b.innerHTML = `${ICON[id]}<span>${APPS[id].title}</span>`;
+  b.addEventListener('click', e => {
+    iconsEl.querySelectorAll('.icon').forEach(x => x.classList.toggle('sel', x === b));
+    if (e.pointerType === 'touch' || e.detail === 0) openApp(id);
+  });
+  b.addEventListener('dblclick', () => openApp(id));
+  iconsEl.appendChild(b);
+});
+startmenu.innerHTML = `<div class="head">Alp Yücel</div>` +
+  DESKTOP.filter(id => id !== 'trash').map(id => `<button type="button" data-open="${id}">${ICON[id]}${APPS[id].title}</button>`).join('') +
+  `<hr><button type="button" data-leave>${tile('#24302a', '<path d="M27 14h8v20h-8M13 24h15M19 18l-6 6 6 6" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>')}Stand up</button>`;
+startmenu.addEventListener('click', e => {
+  const o = e.target.closest('[data-open]'), l = e.target.closest('[data-leave]');
+  if (o) { openApp(o.dataset.open); toggleStart(false); }
+  if (l) { toggleStart(false); unfocus(); }
+});
+function toggleStart(v = startmenu.hidden) { startmenu.hidden = !v; startBtn.classList.toggle('open', v); }
+startBtn.onclick = () => toggleStart();
+screenEl.addEventListener('pointerdown', e => {
+  if (!startmenu.hidden && !e.target.closest('#startmenu, #startBtn')) toggleStart(false);
+  if (!e.target.closest('.icon')) iconsEl.querySelectorAll('.icon').forEach(x => x.classList.remove('sel'));
+});
+
+function openApp(id, def = APPS[id]) {
+  if (wins.has(id)) { const w = wins.get(id); w.el.classList.remove('min'); raise(id); return w; }
+  const el = document.createElement('div');
+  el.className = 'win';
+  const H = SH - 56;
+  const x = Math.min(SW - def.w - 16, 150 + cascade * 30), y = Math.min(H - def.h - 10, 22 + cascade * 26);
+  cascade = (cascade + 1) % 6;
+  Object.assign(el.style, { left: Math.max(10, x) + 'px', top: Math.max(10, y) + 'px', width: def.w + 'px', height: def.h + 'px' });
+  el.innerHTML = `<div class="bar"><span class="wtitle">${def.title}</span><button type="button" data-a="min" aria-label="Minimize">–</button><button type="button" data-a="close" aria-label="Close">×</button></div><div class="wbody">${def.html()}</div>`;
+  winsEl.appendChild(el);
+  const tb = document.createElement('button'); tb.type = 'button'; tb.textContent = def.title; taskwins.appendChild(tb);
+  const w = { id, el, tb, cleanup: null };
+  wins.set(id, w);
+  tb.onclick = () => {
+    if (el.classList.contains('top') && !el.classList.contains('min')) minimize(id);
+    else { el.classList.remove('min'); raise(id); }
+  };
+  el.addEventListener('pointerdown', () => raise(id));
+  $('[data-a="min"]', el).onclick = e => { e.stopPropagation(); minimize(id); };
+  $('[data-a="close"]', el).onclick = e => { e.stopPropagation(); closeApp(id); };
+  makeDraggable(el, $('.bar', el));
+  if (def.mount) w.cleanup = def.mount($('.wbody', el), w) || null;
+  raise(id);
+  return w;
+}
+function raise(id) {
+  wins.forEach(w => { w.el.classList.remove('top'); w.tb.classList.remove('on'); });
+  const w = wins.get(id); if (!w) return;
+  w.el.style.zIndex = ++zTop; w.el.classList.add('top'); w.tb.classList.add('on'); w.tb.classList.remove('mn');
+  onTopChange(id);
+}
+function topWin() { let best = null; wins.forEach(w => { if (!w.el.classList.contains('min') && (!best || +w.el.style.zIndex > +best.el.style.zIndex)) best = w; }); return best; }
+function minimize(id) {
+  const w = wins.get(id); w.el.classList.add('min'); w.el.classList.remove('top'); w.tb.classList.remove('on'); w.tb.classList.add('mn');
+  const t = topWin(); if (t) raise(t.id); else onTopChange(null);
+}
+function closeApp(id) {
+  const w = wins.get(id); if (!w) return;
+  w.cleanup?.(); w.el.remove(); w.tb.remove(); wins.delete(id);
+  const t = topWin(); if (t) raise(t.id); else onTopChange(null);
+}
+function openProject(i) {
+  const p = PROJECTS[i];
+  openApp('proj' + i, { title: p.name, w: 560, h: 600, html: () => `
+    <div class="doc proj"><div class="hero" style="background:${p.color}"></div><h3>${p.tag} · ${p.year}</h3><h2>${p.name}</h2><p>${p.text}</p><p class="muted">${p.role}</p></div>` });
+}
+// screen-space → OS-pixel scale (the screen is a CSS3D object, so its on-page size depends on the camera)
+const osScale = () => screenEl.getBoundingClientRect().width / SW || 1;
+function makeDraggable(el, handle) {
+  handle.addEventListener('pointerdown', e => {
+    if (e.target.closest('button')) return;
+    const s = osScale(), sx = e.clientX, sy = e.clientY, ox = el.offsetLeft, oy = el.offsetTop;
+    handle.setPointerCapture(e.pointerId); handle.style.cursor = 'grabbing';
+    const move = ev => {
+      el.style.left = Math.min(SW - 80, Math.max(80 - el.offsetWidth, ox + (ev.clientX - sx) / s)) + 'px';
+      el.style.top = Math.min(SH - 56 - 46, Math.max(0, oy + (ev.clientY - sy) / s)) + 'px';
+    };
+    const up = () => { handle.style.cursor = ''; handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); };
+    handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up);
+  });
+}
+
+function mountTerminal(body) {
+  const out = $('.out', body), input = $('input', body), term = $('.term', body);
+  const print = (t = '') => { const d = document.createElement('div'); d.textContent = t; out.appendChild(d); body.scrollTop = body.scrollHeight; };
+  const CMDS = {
+    help: () => print('commands: whoami, now, stack, claude, ls, cat <file>, projects, open <app>, contact, office, date, clear, exit'),
+    now: () => print('studying  MSc Management @ TUM — Finance & Innovation\nworking   PMO working student @ Infineon — automation\nbuilding  AI products and automation tools\nlooking   innovation · venture capital · startups'),
+    whoami: () => print('Alp Yücel — automation and AI products, with an engineering and finance background. MSc Management @ TUM.'),
+    stack: () => print('ai    Claude Code · Claude API · ChatGPT · Copilot\ncode  Python · TypeScript · SQL · R · MATLAB\nweb   Next.js · React · Supabase · Three.js\n3d    Blender (Python scripting)\ndata  Power BI · Tableau · Excel'),
+    claude: () => print('claude: already running. This office was built with it.'),
+    ls: () => print('about.txt  experience.txt  projects/  contact.txt  interests.txt  secret.txt'),
+    cat: a => ({
+      'about.txt': () => print('Mechanical engineer turned management graduate student. I automate recurring work and build AI products.'),
+      'experience.txt': () => print('2026–      Infineon — PMO Working Student\n2025       ROKETSAN — Junior Project Manager\n2023–2024  EY — Technology Consulting Intern\n2022       Turkish Aerospace — Engineering Intern'),
+      'contact.txt': () => print('alpyucel12@gmail.com · linkedin.com/in/alp-yucel'),
+      'interests.txt': () => print('AI tools, building with Claude Code, startups & venture capital, gaming, cinema, music production, history'),
+      'secret.txt': () => print('The other three screens have never been switched on. Nobody has noticed.'),
+    }[a] || (() => print(`cat: ${a || ''}: no such file`)))(),
+    projects: () => PROJECTS.forEach((p, i) => print(`${i + 1}. ${p.name} — ${p.kind}`)),
+    open: a => { const id = Object.keys(APPS).find(k => k === a || APPS[k].title.toLowerCase() === (a || '').toLowerCase()); id ? (openApp(id), print(`opened ${APPS[id].title}`)) : print('usage: open about|lab|work|projects|paint|snake|contact'); },
+    contact: () => print('email: alpyucel12@gmail.com · linkedin.com/in/alp-yucel'),
+    office: () => print('3 coworkers online · 3 screens off · productivity: 100% (estimated)'),
+    deutsch: () => print('Ich lerne noch Deutsch — A2, und jeden Tag ein bisschen besser.'),
+    date: () => print(new Date().toLocaleString('en-GB')),
+    clear: () => { out.innerHTML = ''; },
+    sudo: () => print('Everyone is equal in this office. No sudo.'),
+    exit: () => { print('standing up…'); setTimeout(unfocus, 300); },
+  };
+  print('AlpOS terminal 1.0 — type "help"');
+  input.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const raw = input.value.trim(); input.value = '';
+    print(`alp@alpos:~$ ${raw}`);
+    if (!raw) return;
+    const [c, ...rest] = raw.split(/\s+/);
+    (CMDS[c.toLowerCase()] || (() => print(`${c}: command not found. Type "help".`)))(rest.join(' '));
+  });
+  term.addEventListener('click', () => input.focus());
+  setTimeout(() => input.focus(), 50);
+}
+function mountPaint(body) {
+  const cv = $('canvas', body), g = cv.getContext('2d'), tools = $('.tools', body);
+  g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.lineCap = g.lineJoin = 'round';
+  const colors = ['#1f2230', '#d9634a', '#c9792b', '#e6b84f', '#4d7a5a', '#3f6e8c', '#7c4a64', '#ffffff'];
+  let color = colors[0];
+  colors.forEach((c, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'sw' + (i ? '' : ' on'); b.style.background = c;
+    b.setAttribute('aria-label', 'Colour ' + c);
+    b.onclick = () => { color = c; tools.querySelectorAll('.sw').forEach(x => x.classList.toggle('on', x === b)); };
+    tools.appendChild(b);
+  });
+  const clr = document.createElement('button'); clr.type = 'button'; clr.className = 'tb'; clr.textContent = 'Clear';
+  clr.onclick = () => { g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); };
+  tools.appendChild(clr);
+  const pt = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * cv.width, (e.clientY - r.top) / r.height * cv.height]; };
+  let drawing = false, lx = 0, ly = 0;
+  cv.addEventListener('pointerdown', e => { drawing = true; cv.setPointerCapture(e.pointerId); [lx, ly] = pt(e); });
+  cv.addEventListener('pointermove', e => {
+    if (!drawing) return; const [x, y] = pt(e);
+    g.strokeStyle = color; g.lineWidth = color === '#ffffff' ? 40 : 9; g.beginPath(); g.moveTo(lx, ly); g.lineTo(x, y); g.stroke(); [lx, ly] = [x, y];
+  });
+  cv.addEventListener('pointerup', () => { drawing = false; });
+}
+let snakeBest = 0;
+function mountSnake(body, w) {
+  const cv = $('canvas', body), g = cv.getContext('2d'), sc = $('.sc', body), N = 20, C = 20;
+  let snake, dir, next, food, score, alive = false, timer = null;
+  const reset = () => { snake = [[10, 10], [9, 10], [8, 10]]; dir = next = [1, 0]; score = 0; place(); };
+  const place = () => { do { food = [Math.floor(Math.random() * N), Math.floor(Math.random() * N)]; } while (snake.some(s => s[0] === food[0] && s[1] === food[1])); };
+  const draw = msg => {
+    g.fillStyle = '#2a3527'; g.fillRect(0, 0, 400, 400);
+    g.fillStyle = '#e6b84f'; g.fillRect(food[0] * C + 4, food[1] * C + 4, C - 8, C - 8);
+    snake.forEach((s, i) => { g.fillStyle = i ? '#9cc48a' : '#cfe3c4'; g.fillRect(s[0] * C + 1, s[1] * C + 1, C - 2, C - 2); });
+    if (msg) { g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 160, 400, 80); g.fillStyle = '#cfe3c4'; g.font = '500 20px "IBM Plex Mono", monospace'; g.textAlign = 'center'; g.fillText(msg, 200, 207); }
+    sc.textContent = `Score: ${score} · best: ${snakeBest}`;
+  };
+  const step = () => {
+    dir = next;
+    const h = [snake[0][0] + dir[0], snake[0][1] + dir[1]];
+    if (h[0] < 0 || h[1] < 0 || h[0] >= N || h[1] >= N || snake.some(s => s[0] === h[0] && s[1] === h[1])) {
+      alive = false; clearInterval(timer); snakeBest = Math.max(snakeBest, score); Sound.tone(150, 0, .4, .06, 'square'); draw('game over · space to retry'); return;
+    }
+    snake.unshift(h);
+    if (h[0] === food[0] && h[1] === food[1]) { score++; Sound.blip(); place(); } else snake.pop();
+    draw();
+  };
+  const start = () => { reset(); alive = true; clearInterval(timer); timer = setInterval(step, 115); };
+  const onKey = e => {
+    if (!focused || !w.el.classList.contains('top') || w.el.classList.contains('min')) return;
+    const m = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0] }[e.key];
+    if (e.key === ' ') { e.preventDefault(); if (!alive) start(); return; }
+    if (m) { e.preventDefault(); if (m[0] !== -dir[0] || m[1] !== -dir[1]) next = m; if (!alive) start(); }
+  };
+  addEventListener('keydown', onKey);
+  cv.addEventListener('click', () => { if (!alive) start(); });
+  reset(); draw('press space or click');
+  return () => { clearInterval(timer); removeEventListener('keydown', onKey); };
+}
+const clock = $('#clock');
+const tick = () => { clock.textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); };
+tick(); setInterval(tick, 30000);
+const boot = $('#boot'), bootLog = $('#bootLog');
+let booted = false;
+function runBoot() {
+  if (booted) return; booted = true;
+  const lines = ['AlpOS 1.0 starting', 'cathode ray tube .. warming up', 'memory ............ 640 KB ought to be enough', 'other terminals ... no response (3)', 'desktop ........... ready'];
+  $('.logo', boot).remove(); boot.classList.add('run');
+  lines.forEach((l, i) => setTimeout(() => { const d = document.createElement('div'); d.textContent = '> ' + l; bootLog.appendChild(d); Sound.key(); }, reduce ? 0 : 160 + i * 240));
+  setTimeout(() => { boot.classList.add('gone'); Sound.chime(); openApp('about'); }, reduce ? 50 : 1650);
+}
+
+/* =====================================================================
+   3D OFFICE (units: centimetres)
+   ===================================================================== */
+let gl;
+try { gl = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
+catch (e) { $('#gateGo').textContent = 'Your browser does not support WebGL.'; throw e; }
+const DPR = Math.min(devicePixelRatio, 2);
+gl.setPixelRatio(DPR);
+// lighting is baked in Blender (Cycles); only the live parts are shaded at runtime
+gl.toneMapping = THREE.NoToneMapping;
+gl.domElement.className = 'gl';
+const css = new CSS3DRenderer(); css.domElement.className = 'css';
+// a live update can re-run this script without a reload: drop layers left by the previous run
+app.querySelectorAll(':scope > .css, :scope > .gl').forEach(el => el.remove());
+app.prepend(gl.domElement); app.prepend(css.domElement);
+
+const FOG = 0x050807;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(FOG);
+scene.fog = new THREE.Fog(FOG, 950, 2600);   // near/far follow the camera, see frame()
+const pmrem = new THREE.PMREMGenerator(gl);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const cssScene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 1, 5, 9000);
+camera.layers.enable(1);   // layer 1: the dark clusters, which the floor mirror skips
+
+// ---------- procedural textures ----------
+function canvasTex(w, h, draw, repeat) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); }
+  t.anisotropy = 4; return t;
+}
+const grain = (g, w, h, lo, hi) => {
+  const img = g.getImageData(0, 0, w, h), d = img.data;
+  for (let i = 0; i < d.length; i += 4) { const k = lo + Math.random() * (hi - lo); d[i] *= k; d[i + 1] *= k; d[i + 2] *= k; }
+  g.putImageData(img, 0, 0);
+};
+const floorTex = canvasTex(512, 512, (g, w, h) => {
+  g.fillStyle = '#4a9a5e'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 40; i++) {
+    const x = Math.random() * w, y = Math.random() * h, r = 40 + Math.random() * 120, l = Math.random() < .5;
+    for (const [ox, oy] of [[0, 0], [w, 0], [-w, 0], [0, h], [0, -h]]) {
+      const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+      gr.addColorStop(0, l ? 'rgba(170,230,180,.12)' : 'rgba(10,50,25,.14)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    }
+  }
+  grain(g, w, h, .93, 1.04);
+}, 7);
+const fabricTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); grain(g, w, h, .72, 1); }, 6);
+const lamTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); grain(g, w, h, .955, 1); }, 3);
+
+// transparent surfaces must not punch alpha holes into the canvas (that is reserved for the CRT screen)
+function keepAlpha(m) {
+  m.transparent = true; m.blending = THREE.CustomBlending;
+  m.blendSrc = THREE.SrcAlphaFactor; m.blendDst = THREE.OneMinusSrcAlphaFactor;
+  m.blendSrcAlpha = THREE.ZeroFactor; m.blendDstAlpha = THREE.OneFactor;
+  return m;
+}
+
+// ---------- materials ----------
+const S = (o) => new THREE.MeshStandardMaterial({ roughness: .6, metalness: 0, ...o });
+const M = {
+  desk: S({ color: 0xebe8e1, map: lamTex, roughness: .5 }),
+  deskEdge: S({ color: 0xd3cfc6, roughness: .55 }),
+  part: S({ color: 0x1b1f1d, map: fabricTex, roughness: .95 }),
+  trim: S({ color: 0xe3e0d8, roughness: .45 }),
+  crt: S({ color: 0xe6dfce, roughness: .42 }),
+  crtDark: S({ color: 0xcbc2ad, roughness: .5 }),
+  glassOff: new THREE.MeshPhysicalMaterial({ color: 0x131a17, roughness: .1, metalness: 0, clearcoat: 1, clearcoatRoughness: .05 }),
+  kbBase: S({ color: 0xdfe3e8, roughness: .35 }),
+  key: S({ color: 0x7aa6e6, emissive: 0x2a5cb8, emissiveIntensity: .35, roughness: .35 }),
+  chair: S({ color: 0x24262c, roughness: .55 }),
+  chairMesh: S({ color: 0x2c2f36, map: fabricTex, roughness: .85 }),
+  metal: S({ color: 0x4a4e57, roughness: .28, metalness: .7 }),
+  suit: S({ color: 0x3b4049, map: fabricTex, roughness: .85 }),
+  skin: S({ color: 0xd8a88a, roughness: .62 }),
+  hair: S({ color: 0x2a1e18, roughness: .75 }),
+  shirt: S({ color: 0xf2f2ee, roughness: .7 }),
+  tie: S({ color: 0x1f2329, roughness: .5 }),
+  shoe: S({ color: 0x141518, roughness: .3 }),
+  ledOn: new THREE.MeshBasicMaterial({ color: 0x6cf08a }),
+  ledOff: S({ color: 0x5a4a2a, roughness: .4 }),
+};
+
+// ---------- geometry helpers ----------
+const shadowed = m => { m.castShadow = m.receiveShadow = true; return m; };
+function rbox(w, h, d, r, mat, x, y, z, parent) {
+  const m = shadowed(new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, Math.min(r, w / 2 - .01, h / 2 - .01, d / 2 - .01)), mat));
+  m.position.set(x, y, z); parent.add(m); return m;
+}
+function cyl(rt, rb, h, mat, x, y, z, parent, seg = 16) {
+  const m = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat)); m.position.set(x, y, z); parent.add(m); return m;
+}
+function sphere(r, mat, x, y, z, parent) {
+  const m = shadowed(new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), mat)); m.position.set(x, y, z); parent.add(m); return m;
+}
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+function limb(a, b, r, mat, parent) {
+  const len = a.distanceTo(b);
+  const m = shadowed(new THREE.Mesh(new THREE.CapsuleGeometry(r, Math.max(.01, len), 4, 12), mat));
+  m.position.copy(a).add(b).multiplyScalar(.5);
+  m.quaternion.setFromUnitVectors(V(0, 1, 0), b.clone().sub(a).normalize());
+  parent.add(m); return m;
+}
+
+// ---------- floor: mirror underneath a translucent green epoxy layer ----------
+const mirror = new Reflector(new THREE.PlaneGeometry(6000, 6000), {
+  textureWidth: Math.floor(innerWidth * DPR * .5), textureHeight: Math.floor(innerHeight * DPR * .5), color: 0x8a9a8f, clipBias: 0.003,
+});
+mirror.rotation.x = -Math.PI / 2; mirror.position.y = -0.2; scene.add(mirror);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000),
+  keepAlpha(S({ color: 0xffffff, map: floorTex, roughness: .42, opacity: .8, depthWrite: false })));
+floor.material.map.repeat.set(9, 9);
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+
+// ---------- workstation (one quadrant of the pinwheel) ----------
+// desks, partitions, CRT housings and chairs come baked from office.glb;
+// only the parts that move, glow or reflect are built here
+const stations = [];
+function makeStation(i, active) {
+  const q = new THREE.Group(); q.rotation.y = i * Math.PI / 2; scene.add(q);
+  const crt = new THREE.Group(); crt.position.set(100, 75, 34); q.add(crt);
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(38, 34, 36), new THREE.MeshBasicMaterial({ visible: false }));
+  hit.position.set(0, 19, 0); crt.add(hit);
+  const screen = active
+    ? new THREE.Mesh(new THREE.PlaneGeometry(30, 22.5), new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0, blending: THREE.NoBlending, side: THREE.DoubleSide }))
+    : new THREE.Mesh(new THREE.PlaneGeometry(30, 22.5), M.glassOff);
+  screen.position.set(0, 19.5, 17.85); crt.add(screen);
+  const kb = new THREE.Group(); kb.position.set(96, 75, 62); q.add(kb);
+  const keys = new THREE.InstancedMesh(new RoundedBoxGeometry(2.3, 1, 2.3, 2, .35), M.key, 56); kb.add(keys);
+  const dummy = new THREE.Object3D(), base = [];
+  for (let r = 0, k = 0; r < 4; r++) for (let c = 0; c < 14; c++, k++) {
+    dummy.position.set(-16.9 + c * 2.6, 2.2, -3.9 + r * 2.6); dummy.updateMatrix(); keys.setMatrixAt(k, dummy.matrix); base.push(dummy.position.clone());
+  }
+  const chair = new THREE.Group(); q.add(chair);
+  if (active) { chair.position.set(112, 0, 126); chair.rotation.y = .45; } else chair.position.set(96, 0, 108);
+  const worker = active ? null : { typing: true, until: 0, seed: i };   // the MakeHuman body arrives from workers.glb
+  const st = { q, crt, screen, kb: { keys, base, press: new Float32Array(56), dummy }, chair, worker, active };
+  stations.push(st); return st;
+}
+const ACTIVE = 0;
+for (let i = 0; i < 4; i++) makeStation(i, i === ACTIVE);
+const act = stations[ACTIVE];
+scene.updateMatrixWorld(true);
+
+// mount the OS onto the working CRT
+const SCREEN = { w: 30, h: 22.5 };
+const SCREEN_POS = act.screen.getWorldPosition(new THREE.Vector3());
+const SCREEN_N = act.screen.getWorldDirection(new THREE.Vector3());
+const cssObj = new CSS3DObject(screenEl);
+cssObj.position.copy(SCREEN_POS);
+cssObj.quaternion.copy(act.screen.getWorldQuaternion(new THREE.Quaternion()));
+cssObj.scale.setScalar(SCREEN.w / SW);
+cssScene.add(cssObj);
+const monitorHits = [];
+act.crt.traverse(o => o.isMesh && monitorHits.push(o));
+
+// ---------- model loading ----------
+// The host serves .txt but not .glb, and its CSP blocks data: URIs and fetches of blob: URLs.
+// So each GLB ships as base64 text, is decoded here and parsed from memory; textures go through
+// <img> (TextureLoader) instead of fetch + createImageBitmap.
+const gltfLoader = new GLTFLoader();
+const MODEL_BYTES = { 'office.glb.txt': 4392664, 'workers.glb.txt': 6253120, 'cluster.glb.txt': 552808 };   // only used to size the loading bar
+const modelGot = {};
+function drawLoad() {
+  let got = 0, all = 0;
+  for (const k in MODEL_BYTES) { got += Math.min(modelGot[k] || 0, MODEL_BYTES[k]); all += MODEL_BYTES[k]; }
+  const pct = Math.min(99, Math.floor(got / all * 100));
+  $('#gateBar').style.width = pct + '%'; $('#gateGo').textContent = `setting up the office… ${pct}%`;
+}
+async function loadGLB(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(url + ': HTTP ' + res.status);
+  const reader = res.body.getReader(), chunks = [];
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value); modelGot[url] = (modelGot[url] || 0) + value.length; drawLoad();
+  }
+  const bin = atob((await new Blob(chunks).text()).trim());
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Promise((resolve, reject) => {
+    const cib = self.createImageBitmap;
+    try { self.createImageBitmap = undefined; gltfLoader.parse(bytes.buffer, '', resolve, reject); }
+    finally { self.createImageBitmap = cib; }
+  });
+}
+
+// ---------- baked office (Blender → office.glb) ----------
+let officeReady = false, activeChairMesh = null;
+const setActiveChair = v => { if (activeChairMesh) activeChairMesh.visible = v; };
+const officeLoad = loadGLB('office.glb.txt').then(gltf => {
+  const root = gltf.scene; root.scale.setScalar(100);
+  root.traverse(o => {
+    if (!o.isMesh) return;
+    const map = o.material.map;
+    if (o.name === 'FloorShade') {
+      o.material = new THREE.MeshBasicMaterial({ map, blending: THREE.MultiplyBlending, transparent: true, premultipliedAlpha: true, depthWrite: false, fog: false });
+      o.position.y += 0.004; o.renderOrder = 1;
+    } else {
+      o.material = new THREE.MeshBasicMaterial({ map });
+      if (o.name === 'ActiveChair') activeChairMesh = o;
+    }
+  });
+  scene.add(root);
+  officeReady = true;
+}).catch(err => {
+  console.error(err); officeReady = true;
+  $('#gateAsk').textContent = 'the office model did not load · enter anyway?';
+});
+
+// ---------- coworkers (MakeHuman via MPFB in Blender → rigged glTF with a typing loop) ----------
+const mixers = [];
+const workersLoad = loadGLB('workers.glb.txt').then(gltf => {
+  stations.filter(st => st.worker).forEach((st, j) => {
+    const node = gltf.scene.getObjectByName(`Worker${j}`);
+    if (!node) return;
+    const holder = new THREE.Group(); holder.scale.setScalar(100);
+    holder.add(node); st.chair.add(holder);
+    node.traverse(o => {
+      if (!o.isMesh) return;
+      o.frustumCulled = false;
+      if (/hair|eyebrow|eyelash/i.test(o.material.name)) { o.material.alphaTest = .5; o.material.transparent = false; }
+    });
+    const clip = gltf.animations.find(c => c.name === `Worker${j}_typing`);
+    if (clip) {
+      const mixer = new THREE.AnimationMixer(node);
+      const action = mixer.clipAction(clip); action.time = j * .37; action.play();
+      mixers.push(mixer);
+    }
+  });
+}).catch(err => console.error(err));
+
+// ---------- the open office: dark, empty clusters around the one lit island ----------
+const SPACING = 560, REACH = 2500;
+const lightAt = d => .05 + .95 * Math.exp(-Math.pow(d / 430, 3));   // falloff of the pool of light, centimetres from the middle
+const clusterSpots = [];
+for (let ix = -5; ix <= 5; ix++) for (let iz = -5; iz <= 5; iz++) {
+  const d = Math.hypot(ix, iz) * SPACING;
+  if ((ix || iz) && d <= REACH) clusterSpots.push({ x: ix * SPACING, z: iz * SPACING, d });
+}
+// darkness over floor and mirror, with a soft contact shadow under each cluster
+{
+  const N = 2048, W = 6000, cm2px = N / W, c = document.createElement('canvas'); c.width = c.height = N;
+  const g = c.getContext('2d'), img = g.createImageData(N, N);
+  for (let y = 0, i = 0; y < N; y++) for (let x = 0; x < N; x++, i += 4) {
+    const v = Math.pow(lightAt(Math.hypot(x - N / 2 + .5, y - N / 2 + .5) / cm2px), 1 / 2.2) * 255;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const R = 270, n = 128, sprite = document.createElement('canvas'); sprite.width = sprite.height = n;
+  const sg = sprite.getContext('2d'), si = sg.createImageData(n, n);
+  for (let y = 0, i = 0; y < n; y++) for (let x = 0; x < n; x++, i += 4) {
+    const a = Math.max(Math.abs(x / (n - 1) * 2 - 1), Math.abs(y / (n - 1) * 2 - 1)) * R;
+    const v = 255 * (1 - .6 * THREE.MathUtils.smoothstep(R - a, 0, 90));
+    si.data[i] = si.data[i + 1] = si.data[i + 2] = v; si.data[i + 3] = 255;
+  }
+  sg.putImageData(si, 0, 0);
+  g.globalCompositeOperation = 'multiply';
+  clusterSpots.forEach(o => g.drawImage(sprite, (o.x - R + W / 2) * cm2px, (o.z - R + W / 2) * cm2px, 2 * R * cm2px, 2 * R * cm2px));
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const dark = new THREE.Mesh(new THREE.PlaneGeometry(W, W), new THREE.MeshBasicMaterial({
+    map: tex, blending: THREE.MultiplyBlending, transparent: true, premultipliedAlpha: true, depthWrite: false, fog: false }));
+  dark.rotation.x = -Math.PI / 2; dark.position.y = .02; dark.renderOrder = 2; scene.add(dark);
+}
+const clusterLoad = loadGLB('cluster.glb.txt').then(gltf => {
+  gltf.scene.scale.setScalar(100); gltf.scene.updateMatrixWorld(true);
+  const src = gltf.scene.getObjectByName('Cluster');
+  const geo = src.geometry.clone().applyMatrix4(src.matrixWorld);
+  const mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ map: src.material.map }), clusterSpots.length);
+  const m = new THREE.Object3D(), col = new THREE.Color();
+  clusterSpots.forEach((o, i) => {
+    m.position.set(o.x, 0, o.z); m.rotation.y = Math.floor(Math.random() * 4) * Math.PI / 2; m.updateMatrix();
+    mesh.setMatrixAt(i, m.matrix);
+    col.setScalar(lightAt(o.d) * (.63 + Math.random() * .14)); mesh.setColorAt(i, col);
+  });
+  mesh.frustumCulled = false; mesh.layers.set(1); scene.add(mesh);
+}).catch(err => console.error(err));
+
+// ---------- lights (for the live parts: coworkers, keys, glass) ----------
+scene.add(new THREE.HemisphereLight(0xf4f8f2, 0x2f6b43, .55));
+const sun = new THREE.DirectionalLight(0xfff6ea, 1.5);
+sun.position.set(-320, 720, 260);
+scene.add(sun);
+const screenGlow = new THREE.PointLight(0xaecbff, 14, 0, 1);
+screenGlow.position.copy(SCREEN_POS).addScaledVector(SCREEN_N, 14); screenGlow.position.y -= 4;
+scene.add(screenGlow);
+const GLOW = { terminal: 0x9be3a0, snake: 0x9be3a0, paint: 0xffd9a8, contact: 0xffb8a0 };
+const glowTarget = new THREE.Color(0xaecbff);
+onTopChange = id => glowTarget.set(GLOW[id] ?? 0xaecbff);
+
+// ---------- dust ----------
+const dustN = 160, dustPos = new Float32Array(dustN * 3);
+for (let i = 0; i < dustN; i++) { dustPos[i * 3] = (Math.random() - .5) * 520; dustPos[i * 3 + 1] = 10 + Math.random() * 240; dustPos[i * 3 + 2] = (Math.random() - .5) * 520; }
+const dustGeo = new THREE.BufferGeometry(); dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+const dust = new THREE.Points(dustGeo, keepAlpha(new THREE.PointsMaterial({ color: 0xffffff, size: 1.3, opacity: .35, depthWrite: false })));
+scene.add(dust);
+
+// ---------- post: chromatic aberration + vignette + grain (alpha preserved for the CSS screen) ----------
+// the composer draws off-screen, where the context's antialias flag does not apply: multisample its target
+const composer = new EffectComposer(gl, new THREE.WebGLRenderTarget(innerWidth * DPR, innerHeight * DPR, { type: THREE.HalfFloatType, samples: 4 }));
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new OutputPass());
+const fx = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uCA: { value: .0035 }, uVig: { value: .45 }, uGrain: { value: .055 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uTime, uCA, uVig, uGrain; varying vec2 vUv;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main(){
+      vec2 d = vUv - .5; float r2 = dot(d, d);
+      vec2 off = d * uCA * (.4 + r2 * 3.0);
+      vec4 c = texture2D(tDiffuse, vUv);
+      float a = clamp(c.a, 0., 1.);
+      vec3 col = vec3(texture2D(tDiffuse, vUv + off).r, c.g, texture2D(tDiffuse, vUv - off).b);
+      col *= 1. - uVig * smoothstep(.08, .55, r2);
+      col += (hash(vUv * 1000. + uTime) - .5) * uGrain;
+      gl_FragColor = vec4(col * a, a);
+    }`,
+});
+composer.addPass(fx);
+const fxTarget = { ca: .0035, vig: .45 };
+
+/* =====================================================================
+   CAMERA + INTERACTION — click the working CRT to sit down;
+   click anywhere off the screen (or Esc / start menu / "exit") to stand up
+   ===================================================================== */
+const home = { pos: V(330, 560, 470), target: V(25, 30, 35) };
+const wide = { pos: V(1250, 2050, 2050), target: V(0, 0, 0) };
+const far = { pos: V(60, 3600, 700), target: V(0, 0, 0) };
+function viewPose(view) {
+  const p = view.pos.clone();
+  if (camera.aspect < 1.2) p.sub(view.target).multiplyScalar(1 + (1.2 - camera.aspect) * .9).add(view.target);
+  return { pos: p, target: view.target.clone() };
+}
+const homePose = () => viewPose(home), widePose = () => viewPose(wide);
+function focusPose() {
+  const vf = THREE.MathUtils.degToRad(camera.fov), hf = 2 * Math.atan(Math.tan(vf / 2) * camera.aspect);
+  const d = Math.max((SCREEN.h / .94 / 2) / Math.tan(vf / 2), (SCREEN.w / .97 / 2) / Math.tan(hf / 2));
+  return { pos: SCREEN_POS.clone().addScaledVector(SCREEN_N, d), target: SCREEN_POS.clone() };
+}
+let focused = false, zoomed = false, started = false, anim = null, entered = false;
+const cur = { pos: far.pos.clone(), target: far.target.clone() };
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+function goTo(pose, dur = 1500, done) { anim = { from: { pos: cur.pos.clone(), target: cur.target.clone() }, to: pose, t0: performance.now(), dur: reduce ? 1 : dur, done }; }
+const whisper = $('#whisper');
+const HINT_WIDE = 'one desk is still lit · click it', HINT_CLUSTER = 'one of the four computers is on · click it';
+function hint(text) { whisper.textContent = text; if (!entered) whisper.classList.add('on'); }
+function zoomIn() {
+  if (zoomed || !started) return;
+  zoomed = true; whisper.classList.remove('on');
+  Sound.click(); Sound.burst(300, .7, .25, .6);
+  goTo(homePose(), 2400, () => hint(HINT_CLUSTER));
+}
+function zoomOut() {
+  if (!zoomed || focused) return;
+  zoomed = false; whisper.classList.remove('on');
+  Sound.burst(300, .7, .2, .6);
+  goTo(widePose(), 2400, () => hint(HINT_WIDE));
+}
+function focus() {
+  if (focused || !started) return;
+  focused = true; entered = true; whisper.classList.remove('on');
+  fxTarget.ca = 0; fxTarget.vig = .12;
+  Sound.burst(400, .5, .25, .6);
+  goTo(focusPose(), 1600, () => { screenEl.classList.add('live'); setActiveChair(false); if (!booted) Sound.crtOn(); runBoot(); });
+}
+function unfocus() {
+  if (!focused) return;
+  focused = false; screenEl.classList.remove('live'); toggleStart(false); setActiveChair(true);
+  document.activeElement?.blur?.();
+  fxTarget.ca = .0035; fxTarget.vig = .45;
+  Sound.burst(300, .5, .2, .6);
+  goTo(homePose(), 1600);
+}
+function pressKey(st) { st.kb.press[Math.floor(Math.random() * 56)] = 1; }
+addEventListener('keydown', e => {
+  if (e.key === 'Escape') { focused ? unfocus() : zoomOut(); return; }
+  if (!focused) return;
+  pressKey(act);
+  if (e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace') Sound.key();
+});
+
+const gate = $('#gate');
+function enter(withSound) {
+  if (started || !officeReady) return;
+  started = true; Sound.init(); Sound.setMuted(!withSound); gate.classList.add('gone');
+  goTo(widePose(), 3200, () => hint(HINT_WIDE));
+}
+gate.querySelectorAll('[data-sound]').forEach(b => { b.onclick = () => enter(b.dataset.sound === '1'); });
+Promise.all([officeLoad, workersLoad, clusterLoad]).then(() => { $('#gateLoad').hidden = true; $('#gateChoose').hidden = false; });
+
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), parallax = new THREE.Vector2();
+const islandHit = new THREE.Mesh(new THREE.BoxGeometry(400, 135, 400), new THREE.MeshBasicMaterial({ visible: false }));
+islandHit.position.y = 67; scene.add(islandHit);
+function hits(e, targets) {
+  const r = app.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  return ray.intersectObjects(targets, false).length > 0;
+}
+const hitsMonitor = e => hits(e, monitorHits), hitsIsland = e => hits(e, [islandHit]);
+let hoverMon = false;
+app.addEventListener('pointermove', e => {
+  const r = app.getBoundingClientRect();
+  parallax.set(((e.clientX - r.left) / r.width) * 2 - 1, ((e.clientY - r.top) / r.height) * 2 - 1);
+  if (!focused && started) { hoverMon = zoomed ? hitsMonitor(e) : hitsIsland(e); app.style.cursor = hoverMon ? 'pointer' : 'default'; }
+  else { hoverMon = false; app.style.cursor = ''; }
+});
+app.addEventListener('pointerdown', e => {
+  if (!started) return;
+  if (focused) { if (screenEl.contains(e.target)) { Sound.click(); return; } unfocus(); return; }
+  if (!zoomed) { if (hitsIsland(e)) zoomIn(); return; }
+  if (hitsMonitor(e)) { Sound.click(); focus(); return; }
+  if (!hitsIsland(e)) zoomOut();
+});
+
+// coworkers type in bursts on screens that are switched off
+setInterval(() => {
+  if (!started) return;
+  const now = performance.now();
+  let sounded = false;
+  stations.forEach(st => {
+    const w = st.worker; if (!w) return;
+    if (now > w.until) { w.typing = Math.random() < .7; w.until = now + 1500 + Math.random() * 4000; }
+    if (w.typing && Math.random() < .55) { pressKey(st); if (!sounded && Math.random() < .5) { Sound.distantKey(focused ? .55 : zoomed ? 1 : .3); sounded = true; } }
+  });
+}, 85);
+
+function resize() {
+  const w = app.clientWidth, h = app.clientHeight;
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  gl.setSize(w, h); css.setSize(w, h); composer.setSize(w, h);
+  mirror.getRenderTarget().setSize(Math.floor(w * DPR * .5), Math.floor(h * DPR * .5));
+  if (!started) return;
+  const p = focused ? focusPose() : zoomed ? homePose() : widePose();
+  if (anim) anim.to = p; else { cur.pos.copy(p.pos); cur.target.copy(p.target); }
+}
+addEventListener('resize', resize);
+resize();
+
+const clockT = new THREE.Clock();
+let frameNo = 0;
+function frame(now) {
+  const t = clockT.getElapsedTime();
+  const dt = Math.min(.05, t - (frame.last ?? t)); frame.last = t;
+  if (!reduce) mixers.forEach(m => m.update(dt));
+  if (anim) {
+    const k = Math.min(1, (now - anim.t0) / anim.dur), e = ease(k);
+    cur.pos.lerpVectors(anim.from.pos, anim.to.pos, e);
+    cur.target.lerpVectors(anim.from.target, anim.to.target, e);
+    if (k >= 1) { const d = anim.done; anim = null; d?.(); }
+  }
+  const amt = focused || reduce || !started ? 0 : 1;
+  const drift = started ? 0 : Math.sin(t * .25) * 40;
+  camera.position.set(cur.pos.x + parallax.x * 30 * amt + drift, cur.pos.y - parallax.y * 18 * amt, cur.pos.z);
+  camera.lookAt(cur.target);
+  const fogAt = camera.position.length();
+  scene.fog.near = fogAt + 700; scene.fog.far = fogAt + 3400;
+  // near plane follows the zoom: the far view needs the depth precision to keep the floor layers apart
+  camera.near = Math.max(5, camera.position.distanceTo(cur.target) * .15); camera.updateProjectionMatrix();
+
+  // keyboards
+  stations.forEach(st => {
+    const kb = st.kb; let dirty = false;
+    for (let i = 0; i < 56; i++) if (kb.press[i] > 0) {
+      kb.press[i] = Math.max(0, kb.press[i] - .14);
+      kb.dummy.position.copy(kb.base[i]); kb.dummy.position.y -= kb.press[i] * .7;
+      kb.dummy.updateMatrix(); kb.keys.setMatrixAt(i, kb.dummy.matrix); dirty = true;
+    }
+    if (dirty) kb.keys.instanceMatrix.needsUpdate = true;
+    const w = st.worker;
+    if (w && w.hands && !reduce) {
+      w.hands.forEach(h => {
+        const bob = w.typing ? Math.max(0, Math.sin(t * 15 + h.ph)) * .9 : 0;
+        h.fore.position.y = h.y0 + bob * .5; h.hand.position.y = h.hy0 + bob;
+      });
+      w.head.rotation.x = .12 + Math.sin(t * .7 + w.seed) * .04;
+      w.head.rotation.y = Math.sin(t * .4 + w.seed * 2) * .08;
+    }
+  });
+  // dust drift
+  if (!reduce) {
+    const p = dustGeo.attributes.position.array;
+    for (let i = 0; i < dustN; i++) { p[i * 3 + 1] += .05 + Math.sin(t + i) * .02; if (p[i * 3 + 1] > 250) p[i * 3 + 1] = 10; }
+    dustGeo.attributes.position.needsUpdate = true;
+  }
+  dust.visible = !focused;
+  screenGlow.color.lerp(glowTarget, .05);
+  screenGlow.intensity = (hoverMon ? 26 : 14) + Math.sin(t * 2.3) * .6;
+  const u = fx.uniforms;
+  u.uTime.value = t % 100;
+  u.uCA.value += (fxTarget.ca - u.uCA.value) * .08;
+  u.uVig.value += (fxTarget.vig - u.uVig.value) * .08;
+
+  css.render(cssScene, camera);
+  // CSS3DRenderer skips unchanged transforms, and Chrome then keeps showing a stale raster of the
+  // screen even though its DOM changed; a tiny per-frame opacity flip forces it to repaint
+  css.domElement.style.opacity = (++frameNo & 1) ? '0.9999' : '1';
+  composer.render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+</script>
