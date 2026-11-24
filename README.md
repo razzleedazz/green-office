@@ -2,7 +2,11 @@
 
 Alp Yücel'in 3D CV sitesi. Site karanlık, büyük bir açık ofisle açılıyor; sadece ortadaki dörtlü masa öbeği aydınlık. Ona tıklayınca kamera yaklaşıyor, dört CRT'den açık olana tıklayınca içinde AlpOS masaüstü açılıyor: About, AI Lab, Now, Experience, Projects, Terminal, Paint, Snake ve Contact.
 
-Yayın: Vercel üzerinde, GitHub reposuna bağlı. `main` dalına her push otomatik yayınlanır.
+Site: https://alpyucel.com
+
+Yayın: Vercel üzerinde (proje adı `alpyucel`), GitHub reposu `razzleedazz/green-office`'e bağlı. `main` dalına her push otomatik yayınlanır.
+
+Domain Porkbun'dan alındı ve yılda bir yenilenir. DNS kayıtları Porkbun panelinde: kök için `A 216.198.79.1`, `www` için `CNAME cname.vercel-dns.com`. `www.alpyucel.com` ana adrese yönlenir.
 
 ## İçeriği değiştirip yayınlama
 
