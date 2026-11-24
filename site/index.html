@@ -659,7 +659,13 @@ function runBoot() {
 let gl;
 try { gl = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
 catch (e) { $('#gateGo').textContent = 'Your browser does not support WebGL.'; throw e; }
-const DPR = Math.min(devicePixelRatio, 2);
+// Render resolution. The frame cost is almost all pixels (multisampled half-float target plus two
+// full-screen passes), so the 3D layer is drawn at up to 1.5x and never above ~3.5 megapixels;
+// frame() lowers dprCap further if the machine still cannot keep up. The CRT's text is DOM, so it stays sharp.
+const MAX_PIXELS = 3.5e6;
+let dprCap = 1.5;
+const pickDPR = (w, h) => Math.max(.75, Math.min(devicePixelRatio, dprCap, Math.sqrt(MAX_PIXELS / Math.max(1, w * h))));
+let DPR = pickDPR(innerWidth, innerHeight);
 gl.setPixelRatio(DPR);
 // lighting is baked in Blender (Cycles); only the live parts are shaded at runtime
 gl.toneMapping = THREE.NoToneMapping;
@@ -1088,6 +1094,7 @@ setInterval(() => {
 function resize() {
   const w = app.clientWidth, h = app.clientHeight;
   camera.aspect = w / h; camera.updateProjectionMatrix();
+  DPR = pickDPR(w, h); gl.setPixelRatio(DPR); composer.setPixelRatio(DPR);
   gl.setSize(w, h); css.setSize(w, h); composer.setSize(w, h);
   mirror.getRenderTarget().setSize(Math.floor(w * DPR * .5), Math.floor(h * DPR * .5));
   if (!started) return;
@@ -1099,7 +1106,19 @@ resize();
 
 const clockT = new THREE.Clock();
 let frameNo = 0;
+// frame-rate governor: after each second or so of slow frames, render the 3D layer a step coarser
+const gov = { last: 0, sum: 0, n: 0, skip: 90 };
+function govern(now) {
+  const d = now - gov.last; gov.last = now;
+  if (!started || d > 250) return;                 // not running yet, or the tab was in the background
+  if (gov.skip > 0) { gov.skip--; return; }        // let shader compilation and camera moves settle
+  gov.sum += d;
+  if (++gov.n < 60) return;
+  const avg = gov.sum / gov.n; gov.sum = gov.n = 0;
+  if (avg > 22 && DPR > .75) { dprCap = Math.max(.75, DPR - .25); gov.skip = 45; resize(); }
+}
 function frame(now) {
+  govern(now);
   const t = clockT.getElapsedTime();
   const dt = Math.min(.05, t - (frame.last ?? t)); frame.last = t;
   if (!reduce) mixers.forEach(m => m.update(dt));
